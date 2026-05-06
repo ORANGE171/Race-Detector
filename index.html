@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Race Detector</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Asimovian&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Asimovian', sans-serif;
+      background: radial-gradient(circle at center, rgb(138, 101, 62), rgb(105, 63, 45));
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding-top: 40px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(12px);
+      border-radius: 18px;
+      margin-top: 20vh;
+      padding: 24px;
+      width: 320px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    }
+
+    input {
+      margin-bottom: 15px;
+      color: white;
+    }
+
+    canvas {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 10px;
+      border: 3px dashed rgba(255,255,255,0.2);
+    }
+
+    canvas:hover {
+        border: 3px dashed rgb(203, 186, 163);
+        cursor: pointer;
+    }
+
+    #result {
+      margin-top: 15px;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .sub {
+      font-size: 12px;
+      opacity: 0.6;
+      margin-top: 6px;
+    }
+
+    footer {
+        background: radial-gradient(circle at center, rgb(74, 48, 19), rgb(47, 28, 19));
+        width: 100%;
+        height: 10rem;
+        margin-bottom: 0px;
+        margin-top: 5rem;
+        text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h1>Race Detector</h1>
+
+  <input type="file" id="upload"> 
+  <canvas id="canvas"></canvas>
+
+  <p id="result">Upload an image of a person, animal or object and see the result...</p>
+  <p class="sub" id="meta"></p>
+</div>
+
+<p style="outline: 2px solid white; padding: 1rem; margin-top: 5rem; margin-left: 3rem; margin-right: 5rem; font-size: 0.9rem;">
+    ⚠︎ DISCLAIMER:
+    <br>This project is only for entertainment purposes and does not promote racism and should not be taken seriously.
+    Do not be racist or exclude people because of their skin color, face, personality, etc.!
+</p>
+
+<footer>
+    <br><p>© 2026 ORANGE171</p>
+    <p style="font-size: 13px;">All Rights reserved!</p>
+</footer>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// 🔍 improved center sampling (less noise)
+function analyzeCenter(ctx, w, h) {
+  const startX = Math.floor(w * 0.3);
+  const startY = Math.floor(h * 0.2);
+  const width = Math.floor(w * 0.4);
+  const height = Math.floor(h * 0.5);
+
+  const data = ctx.getImageData(startX, startY, width, height).data;
+
+  let r = 0, g = 0, b = 0, count = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const rr = data[i];
+    const gg = data[i+1];
+    const bb = data[i+2];
+
+    // 🔥 filter extreme pixels (improves accuracy)
+    if (rr < 15 && gg < 15 && bb < 15) continue;
+    if (rr > 240 && gg > 240 && bb > 240) continue;
+
+    r += rr;
+    g += gg;
+    b += bb;
+    count++;
+  }
+
+  return {
+    r: r / count,
+    g: g / count,
+    b: b / count
+  };
+}
+
+// 🎯 classifier + confidence
+function classify(avg) {
+  const brightness = (avg.r + avg.g + avg.b) / 3;
+  const warmth = (avg.r + avg.g) / 2 - avg.b;
+
+  let label = "Mysterious human 🤔";
+
+  // fun overrides👍🏼
+  if (avg.g > avg.r + 40 && avg.g > avg.b + 40) {
+    label = "Why tf is Shrek here?";
+  }
+  else if (avg.b > avg.r + 40 && avg.b > avg.g + 40) {
+    label = "Avatar? ";
+  }
+  else if (avg.r > 180 && avg.g < 100 && avg.b < 100) {
+    label = "Lightning McQueen?";
+  }
+  else {
+    if (brightness > 200) label = "Put it back in the oven ahh race";
+    else if (brightness > 180) label = "Go outside ahh race";
+    else if (brightness > 160) label = "Oiled up by diddy ahh race 🧴💦";
+    else if (brightness > 140) label = "Normal 👍🏻 (pass ✅)";
+    else if (brightness > 110) label = "Latina 🥵";
+    else if (brightness > 100) label = "BOMBASTIC race 💣💥";
+    else if (brightness > 80) label = "Criminal detected 👮🏻‍♂️❌";
+    else label = "Nigga detected 🥷🏿🚨";
+    }
+
+  // 🔥 fake but stable confidence
+  const confidence =
+    Math.min(100,
+      Math.max(55,
+        100 - Math.abs(warmth) * 0.8
+      )
+    );
+
+  return { label, confidence };
+}
+
+// 📤 upload handler
+document.getElementById("upload").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+
+  img.onload = () => {
+    canvas.width = 300;
+    canvas.height = (img.height / img.width) * 300;
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const avg = analyzeCenter(ctx, canvas.width, canvas.height);
+    const result = classify(avg);
+
+    document.getElementById("result").innerText =
+      `${result.label}`;
+
+    document.getElementById("meta").innerText =
+      `Confidence: ${result.confidence.toFixed(0)}% | RGB(${avg.r.toFixed(0)}, ${avg.g.toFixed(0)}, ${avg.b.toFixed(0)})`;
+  };
+
+  img.src = URL.createObjectURL(file);
+});
+</script>
+
+</body>
+</html>
